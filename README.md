@@ -3,22 +3,20 @@
 
 ## Responsables
 
-| |  |
-| --- | --- | 
-| **Ivan Felipe Maluche Suarez** | | 
-| **Kevin Javier Gonzalez Luna** | | 
-| **Santiago guillen** |  | 
-| **Felipe Hortua** | | 
+| | |
+| :--- | :--- |
+| **Ivan Felipe Maluche Suarez** | |
+| **Kevin Javier Gonzalez Luna** | |
+| **Santiago Guillen** | |
+| **Felipe Hortua** | |
 
 ## Flujo de funcionamiento
 
 ```mermaid
 ---
 config:
-    theme: default
-    layout: dagre
     flowchart:
-    curve: basis
+        curve: basis
 ---
 graph TD
     A([Conexión]) --> B(Espera de un cambio de estado)
