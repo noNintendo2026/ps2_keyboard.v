@@ -10,6 +10,12 @@
 | **Santiago Guillen** | |
 | **Felipe Hortua** | |
 
+## Protocolo
+
+El puerto PS2 está compuesto por dos cables. Hay un cable para datos, cuya transferencia es en serie. El otro cable se emplea para la información del reloj. Este último permite especificar si los datos son válidos y si se pueden recuperar. La información es transmitida como un "paquete" de 11 bits, el cual posee 1 bit de inicio, 8 bits de datos, un bit de paridad impar y finalmente un bit de parada
+
+![PS/2](Imagenes/DTPS2.png)
+
 ## Flujo de funcionamiento
 
 ```mermaid
