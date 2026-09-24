@@ -16,7 +16,6 @@
 ---
 config:
     theme: default
-    look: classic
     layout: dagre
     flowchart:
     curve: basis
