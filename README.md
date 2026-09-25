@@ -13,10 +13,12 @@
 
 ## Protocolo
 
-PS/2 es una interfaz serial **síncrona, bidireccional y half-duplex** entre un **dispositivo** (el teclado) y un **host** (en este proyecto, la FPGA).
+PS/2 es una interfaz serial **síncrona, bidireccional y half-duplex (** entre un **dispositivo** (el teclado) y un **host** (en este proyecto, la FPGA).
 
-> *Host*: quien recibe las teclas y puede enviar comandos. *Dispositivo*: el teclado. El dispositivo **siempre** genera el reloj; el host tiene el control final del bus.
+- *Host*: quien recibe las teclas y puede enviar comandos. *Dispositivo*: el teclado. El dispositivo **siempre** genera el reloj; el host tiene el control final del bus.
 
+- *half-duplex*: Solo envia o recibe, nunca ambas cosas.
+- *Bidireccional*: La comunicacion puede ser de teclado a host o de host a teclado.
 ### Interfaz física
 
 El puerto PS/2 usa dos líneas de señal: **DATA** (datos en serie) y **CLK** (reloj, indica cuándo el dato es válido y puede leerse), más alimentación y tierra.
@@ -47,10 +49,10 @@ El puerto PS/2 usa dos líneas de señal: **DATA** (datos en serie) y **CLK** (r
 <details>
 <summary><strong>Reglas generales del protocolo</strong></summary>
 <ul>
+  <li>Al presionarse una tecla se recibe el paquete de bits que la representan desde el microcontrolador propio del teclado, llegando directamente a DATA </li>
   <li>El teclado siempre genera el reloj, incluso cuando el host es quien envía datos.</li>
   <li>El host puede bloquear la comunicación en cualquier momento bajando CLK al menos <strong>100 µs</strong>.</li>
   <li>Si el host bloquea antes del 11.º pulso de reloj, el teclado aborta y <strong>retransmite todo el bloque</strong> cuando el host libere CLK.</li>
-  <li>Mientras el host inhibe, el teclado guarda las teclas en un buffer de <strong>16 bytes</strong>. Si se llena, las teclas nuevas se ignoran.</li>
   <li>Cada byte viaja en una trama de 11 bits (12 si va del host al teclado).</li>
 </ul>
 </details>
@@ -59,7 +61,7 @@ El puerto PS/2 usa dos líneas de señal: **DATA** (datos en serie) y **CLK** (r
 
 ### Formato
 
-Cada byte se envía en una trama serial con **1 bit de inicio, 8 bits de datos (LSB primero), 1 bit de paridad impar y 1 bit de parada**.
+Cada byte se envía en una trama serial con **1 bit de inicio, 8 bits de datos (bit menos significativo primero y mas significativo ultimo), 1 bit de paridad impar y 1 bit de parada**.
 
 | Bit | Función | Valor |
 | :---: | :--- | :--- |
@@ -78,10 +80,11 @@ Cada byte se envía en una trama serial con **1 bit de inicio, 8 bits de datos (
 
 ### Paridad par/impar
 
-La paridad es una convencion elegida por nostors, los 8 bits de datos mas el bit de paridad deben sumar siempre un número par o impar de unos, esto segun la convencion elegida.
+La paridad es una convencion elegida por nostros, los 8 bits de datos mas el bit de paridad deben sumar siempre un número par o impar de unos, esto segun la convencion elegida.
 
 Quien recibe debe verificar la paridad. Si es incorrecta, el teclado responde como si hubiera recibido un comando inválido (pide reenvío con `FE`).
-
+### Manejo de bloqueos
+En caso de que el host bloquee el reloj (clock ≥ 100 µs ) el teclado guardara el bytes en un buffer de <strong>16 bytes</strong>. Si se llena, las teclas nuevas se ignoran.
 <details>
 <summary>Temporización</summary>
 
@@ -93,7 +96,6 @@ Quien recibe debe verificar la paridad. Si es incorrecta, el teclado responde co
 | Cambio de DATA respecto al flanco de subida de CLK | ≥ 5 µs después |
 | Cambio de DATA respecto al flanco de bajada de CLK | entre 5 y 25 µs antes |
 | CLK alto continuo antes de que el teclado transmita | ≥ 50 µs |
-| Inhibición del host | CLK bajo ≥ 100 µs |
 
 Para diseñar o emular un dispositivo/host, el dato se modifica o muestrea hacia la **mitad de cada celda**, unos 15–25 µs después de la transición de reloj correspondiente.
 
@@ -107,7 +109,7 @@ Para diseñar o emular un dispositivo/host, el dato se modifica o muestrea hacia
 
 El teclado inicia y controla toda la transmisión:
 
-1. Verifica que CLK esté en alto (si no, el host está inhibiendo y el teclado guarda el dato).
+1. Verifica que CLK esté en alto (si no, el host está bloqueando y el teclado guarda el dato).
 2. Espera que CLK lleve al menos 50 µs en alto.
 3. Pone el bit de inicio (`0`) en DATA y genera los pulsos de reloj.
 4. Cada bit se coloca en DATA con CLK en alto y **el host lo lee en el flanco de bajada de CLK**.
@@ -221,13 +223,13 @@ El host puede enviar comandos en cualquier momento. **El envío de un comando ti
 | Comando | Nombre | Argumento | Respuesta del teclado |
 | :---: | :--- | :--- | :--- |
 | `ED` | **Set LEDs** | Segundo byte con el estado de los LEDs (ver abajo) | `FA` tras el comando y `FA` tras el argumento |
-| `EE` | **Echo** | — | `EE` |
+| `EE` | **Echo** | 0xEE (dato de diagnostico)| `EE` |
 | `F0` | **Set scan code set** | Segundo byte: `01`, `02` o `03`. Con `00` se consulta el set en uso | `FA` y espera el argumento (con `00`, devuelve el set actual) |
 | `F3` | **Set typematic rate/delay** | Segundo byte: bits 4:0 tasa de repetición, bits 6:5 retardo inicial | `FA` y espera el argumento |
-| `F4` | **Enable** | — | `FA` (limpia el buffer y habilita el escaneo) |
-| `F5` | **Disable** | — | `FA` (deshabilita el envío de teclas) |
-| `FE` | **Resend** | — | Retransmite el último byte enviado |
-| `FF` | **Reset** | — | `FA` y luego `AA` (self-test) |
+| `F4` | **Enable** | 0xF4 (activacion del escaneo) | `FA` (limpia el buffer y habilita el escaneo) |
+| `F5` | **Disable** | 0xF5 (desactivacion del escaneo) | `FA` (deshabilita el envío de teclas) |
+| `FE` | **Resend** | 0xFE (reenvio del ultimo byte) | Retransmite el último byte enviado |
+| `FF` | **Reset** | 0xFF (reinicia) | `FA` y luego `AA` (self-test) |
 
 ---
 
